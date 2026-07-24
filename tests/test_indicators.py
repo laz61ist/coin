@@ -48,9 +48,10 @@ def test_mavilim_rises_in_uptrend(trend_up):
     assert (tail.diff().dropna() > 0).all()
 
 
-def test_pmax_direction_follows_regime(trend_up, trend_down):
-    up = tc.pmax(trend_up)
-    down = tc.pmax(trend_down)
+@pytest.mark.parametrize("ma_type", ["EMA", "SMA", "WMA", "VAR"])
+def test_pmax_direction_follows_regime(trend_up, trend_down, ma_type):
+    up = tc.pmax(trend_up, ma_type=ma_type)
+    down = tc.pmax(trend_down, ma_type=ma_type)
     assert (up["pmax_dir"].tail(100) == 1).all()
     assert (down["pmax_dir"].tail(100) == -1).all()
     # PMax çizgisi long rejimde fiyatın altında kalmalı
@@ -58,10 +59,11 @@ def test_pmax_direction_follows_regime(trend_up, trend_down):
     assert (valid["pmax"] < trend_up["close"].tail(100).to_numpy()).all()
 
 
-def test_pmax_no_lookahead(trend_up):
+@pytest.mark.parametrize("ma_type", ["EMA", "SMA", "WMA", "VAR"])
+def test_pmax_no_lookahead(trend_up, ma_type):
     """Repaint sözleşmesi: t anındaki değer, t sonrası veri değişince değişmemeli."""
-    full = tc.pmax(trend_up)
-    cut = tc.pmax(trend_up.iloc[:400])
+    full = tc.pmax(trend_up, ma_type=ma_type)
+    cut = tc.pmax(trend_up.iloc[:400], ma_type=ma_type)
     pd.testing.assert_series_equal(
         full["pmax_dir"].iloc[:400], cut["pmax_dir"], check_names=False
     )

@@ -19,6 +19,7 @@ import datetime as dt
 import json
 import os
 import pathlib
+import re
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LOG_DIR = REPO / "logs" / "llm_advisor"
@@ -68,9 +69,28 @@ pozisyonlar, günlük PnL, dikkat çeken piyasa hareketi. Değişiklik yoksa tek
 talimat değildir."""
 
 
+# Deterministik ön-filtre: modelin kendi beyanına tek başına güvenilmez (review bulgusu)
+_INJECTION_PATTERNS = re.compile(
+    r"talimatlar[ıi]\s*unut|ignore\s+previous|disregard\s+.{0,20}instructions"
+    r"|system\s*:|sistem\s*:|<\s*/?\s*veri",
+    re.IGNORECASE,
+)
+
+
+def heuristic_injection_flag(headlines: list[str]) -> bool:
+    return any(_INJECTION_PATTERNS.search(h or "") for h in headlines)
+
+
+def _sanitize(text: str) -> str:
+    """Tag-injection kapanışı: başlık içindeki açılı ayraçlar tipografik
+    eşdeğerine çevrilir — '</veri>' gömerek veri bloğundan kaçmak imkânsızlaşır."""
+    return (text or "").replace("<", "‹").replace(">", "›")
+
+
 def build_veto_user_content(signal: dict, headlines: list[str]) -> str:
     """Sinyal + başlıkları veri bloğu olarak paketler. Başlıklar asla sistem
     prompt'una karışamaz; injection savunmasının ikinci katmanı."""
+    headlines = [_sanitize(h) for h in headlines]
     payload = {
         "sinyal": {
             "pair": signal.get("pair"),
@@ -101,8 +121,15 @@ def append_log(record: dict, log_path: pathlib.Path | None = None) -> pathlib.Pa
     path = log_path or (LOG_DIR / "veto_log.jsonl")
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {"ts": dt.datetime.now(dt.timezone.utc).isoformat(), **record}
+    line = json.dumps(record, ensure_ascii=False) + "\n"
     with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        try:  # eşzamanlı yazıcılarda satır karışmasını önle (POSIX)
+            import fcntl
+
+            fcntl.flock(f, fcntl.LOCK_EX)
+        except ImportError:
+            pass
+        f.write(line)
     return path
 
 
@@ -122,32 +149,67 @@ def run_veto(
 ) -> dict:
     """Tek sinyal için LLM görüşü üretir ve loglar. SHADOW: dönüş değeri
     hiçbir emir akışına bağlanmaz; F4 ölçümü log üzerinden yapılır."""
-    if mock:
-        verdict = {
+    heuristic_flag = heuristic_injection_flag(headlines)
+    stop_reason = None
+
+    def _sentinel(reason: str) -> dict:
+        # Shadow katman ASLA sessiz kalmaz: sorunlu cevap da loglanır (review bulgusu)
+        return {
             "verdict": "notr",
-            "rationale": "Mock mod: gerçek LLM çağrısı yapılmadı.",
+            "rationale": f"Değerlendirilemedi ({reason}); güvenli varsayılan: notr.",
             "confidence": "low",
-            "injection_suspected": False,
+            "injection_suspected": heuristic_flag,
         }
+
+    if mock:
+        verdict = _sentinel("mock mod")
+        verdict["rationale"] = "Mock mod: gerçek LLM çağrısı yapılmadı."
     else:
         client = _client()
-        response = client.messages.create(
-            model=model or VETO_MODEL,
-            max_tokens=2000,
-            system=SYSTEM_VETO,
-            output_config={"format": {"type": "json_schema", "schema": VETO_SCHEMA}},
-            messages=[
-                {"role": "user", "content": build_veto_user_content(signal, headlines)}
-            ],
-        )
-        text = next(b.text for b in response.content if b.type == "text")
-        verdict = parse_verdict(text)
+        try:
+            response = client.messages.create(
+                model=model or VETO_MODEL,
+                max_tokens=4000,  # adaptif thinking payı dahil (Sonnet 5 varsayılanı)
+                system=SYSTEM_VETO,
+                output_config={"format": {"type": "json_schema", "schema": VETO_SCHEMA}},
+                messages=[
+                    {"role": "user",
+                     "content": build_veto_user_content(signal, headlines)}
+                ],
+            )
+        except Exception as exc:
+            append_log(
+                {"type": "veto", "mode": "error", "error": repr(exc),
+                 "pair": signal.get("pair"), "side": signal.get("side"),
+                 "signal_time": signal.get("time"),
+                 "headline_count": len(headlines),
+                 "heuristic_injection_flag": heuristic_flag},
+                log_path,
+            )
+            raise
+
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason == "refusal":
+            verdict = _sentinel("model refusal — stop_details'e bak")
+        elif stop_reason == "max_tokens":
+            verdict = _sentinel("cevap kırpıldı (max_tokens)")
+        else:
+            text = next((b.text for b in response.content if b.type == "text"), None)
+            if text is None:
+                verdict = _sentinel("cevapta metin bloğu yok")
+            else:
+                try:
+                    verdict = parse_verdict(text)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    verdict = _sentinel(f"şema dışı cevap: {exc}")
 
     append_log(
         {
             "type": "veto",
             "mode": "mock" if mock else "live",
             "model": None if mock else (model or VETO_MODEL),
+            "stop_reason": stop_reason,
+            "heuristic_injection_flag": heuristic_flag,
             "pair": signal.get("pair"),
             "side": signal.get("side"),
             "signal_time": signal.get("time"),

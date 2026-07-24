@@ -46,6 +46,10 @@ def main() -> int:
         else:
             print(run_brief(data, model=args.model, mock=args.mock))
         return 0
+    except (StopIteration, json.JSONDecodeError, ValueError) as exc:
+        # advisor artık bunları içeride sentinel'e çevirir; bu dal savunma katmanı
+        print(f"HATA: LLM cevabı beklenen şemaya uymadı: {exc}", file=sys.stderr)
+        return 6
     except Exception as exc:  # tip zinciri: anthropic kuruluysa özelleştir
         try:
             import anthropic

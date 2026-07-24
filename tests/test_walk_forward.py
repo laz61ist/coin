@@ -2,6 +2,7 @@
 
 import datetime as dt
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -106,6 +107,30 @@ def test_sensitivity_report_cliff(tmp_path):
     ]
     text = wf.render_sensitivity_report(grid, tmp_path / "s.md")
     assert "VAR ⚠️" in text
+
+
+def test_reports_survive_empty_input(tmp_path):
+    """Boş veri: istisna değil, dürüst 'KALDI/veri yok' çıktısı."""
+    text = wf.render_walkforward_report([], tmp_path / "r.md")
+    assert "KALDI" in text  # 0 pencere = geçti sayılamaz
+    text2 = wf.render_sensitivity_report([], tmp_path / "s.md")
+    assert "Cliff" in text2
+
+
+def test_load_last_result_picks_matching_json_in_zip(tmp_path):
+    """Zip içinden config değil, kök adı eşleşen ana json seçilmeli."""
+    import zipfile
+
+    stem = "backtest-result-2026-07-24_10-00-00"
+    zpath = tmp_path / f"{stem}.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr(f"{stem}_config.json", json.dumps({"yanlis": True}))
+        zf.writestr(f"{stem}.json", json.dumps(
+            {"strategy": {"TC5in1Strategy": {"profit_total": 0.07}}}))
+    (tmp_path / ".last_result.json").write_text(
+        json.dumps({"latest_backtest": zpath.name}))
+    data = wf.load_last_result(results_dir=tmp_path)
+    assert wf.extract_metrics(data)["profit_total"] == 0.07
 
 
 def test_backtest_cmd_docker_env_passthrough():

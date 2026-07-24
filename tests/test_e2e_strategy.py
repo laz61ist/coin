@@ -134,6 +134,25 @@ def test_exit_is_pmax_flip(chain):
     pd.testing.assert_series_equal(actual, flip_down.fillna(False), check_names=False)
 
 
+def test_leverage_is_capped_at_two():
+    """F5 risk sözleşmesi: kaldıraç tavanı — regresyonu likidasyon riski demek."""
+    strat = TC5in1Strategy({"stake_currency": "USDT", "trading_mode": "futures"})
+    common = dict(pair=PAIR, current_time=None, current_rate=100.0,
+                  proposed_leverage=5.0, entry_tag=None, side="long")
+    assert strat.leverage(max_leverage=10.0, **common) == 2.0
+    assert strat.leverage(max_leverage=1.5, **common) == 1.5  # borsa limiti düşükse ona uy
+
+
+def test_protections_shape_contract():
+    """Koruma katmanı bildirimseldir — yazım hatası sessizce devre dışı bırakır."""
+    strat = TC5in1Strategy({"stake_currency": "USDT", "trading_mode": "futures"})
+    prots = strat.protections
+    methods = {p["method"] for p in prots}
+    assert methods == {"CooldownPeriod", "MaxDrawdown", "StoplossGuard"}
+    dd = next(p for p in prots if p["method"] == "MaxDrawdown")
+    assert dd["max_allowed_drawdown"] <= 0.20  # docs/03 kill-switch sözleşmesi
+
+
 def test_no_lookahead_at_strategy_level():
     """Strateji-seviyesi repaint sözleşmesi: seri kısaltılınca geçmiş sinyaller değişmez.
 

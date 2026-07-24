@@ -153,6 +153,56 @@ def test_run_once_end_to_end(trades, prices, tmp_path):
     assert "KILL SWITCH" in ks_report and "45 gün" in ks_report
 
 
+def test_price_provider_bridges_weekend_gaps():
+    table = {"AAA": {"2026-06-05": 10.0}}  # Cuma; hafta sonu fiyat yok
+    p = run.dict_price_provider(table)
+    assert p("AAA", dt.date(2026, 6, 7)) == 10.0     # Pazar -> Cuma fiyatı
+    assert p("AAA", dt.date(2026, 6, 13)) is None    # 8 gün sonra: boşluk çok uzun
+    assert p("YOK", dt.date(2026, 6, 7)) is None
+
+
+def test_run_once_empty_ranking_and_report(prices, tmp_path):
+    """min_trades'i kimse geçemezse: kırılmadan raporla."""
+    few = models.load_trades([_raw("Tek", "WIN", "Purchase",
+                                   "$1,001 - $15,000", "01/15/2026")])
+    state = {"positions": {}, "hwm": 0.0, "last_run": None, "member": None}
+    r = run.run_once(few, prices, FakeAlpaca(), state, ASOF)
+    assert "Sıralanabilir üye yok" in r["message"] and r["orders"] == []
+    text = run.render_report(r, out_dir=tmp_path).read_text()
+    assert "45 gün" in text
+
+
+def test_main_broker_selection(monkeypatch, tmp_path, trades):
+    """--approve YOKSA AlpacaPaper asla örneklenmemeli (gerçek emir anahtarı)."""
+    import congress.alpaca as alp
+
+    calls = {"paper": 0}
+
+    class _PaperSpy:
+        def __init__(self, *a, **k):
+            calls["paper"] += 1
+            raise AssertionError("dry-run'da AlpacaPaper kurulmamalı")
+
+    monkeypatch.setattr(alp, "AlpacaPaper", _PaperSpy)
+
+    data = tmp_path / "d.json"
+    data.write_text(json.dumps([_raw("Uye A", "WIN", "Purchase",
+                                     "$15,001 - $50,000", "01/15/2026")] * 10))
+    prices_file = tmp_path / "p.json"
+    table = {"WIN": {(dt.date(2026, 1, 1) + dt.timedelta(days=i)).isoformat(): 100 + i
+                     for i in range(200)}}
+    prices_file.write_text(json.dumps(table))
+
+    monkeypatch.setattr(sys, "argv", [
+        "congress.run", "--data", str(data), "--prices-json", str(prices_file),
+        "--asof", ASOF.isoformat(), "--state", str(tmp_path / "s.json"),
+    ])
+    monkeypatch.setattr(run, "REPORT_DIR", tmp_path / "reports")
+    assert run.main() == 0
+    assert calls["paper"] == 0  # dry-run FakeAlpaca kullandı
+    assert (tmp_path / "s.json").exists()
+
+
 def test_leader_filter_f6b(trades, prices):
     ranked = ranking.rank_members(trades, prices, ASOF, min_trades=5,
                                   member_filter={"Uye B"})
