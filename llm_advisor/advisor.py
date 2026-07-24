@@ -78,19 +78,19 @@ _INJECTION_PATTERNS = re.compile(
 
 
 def heuristic_injection_flag(headlines: list[str]) -> bool:
-    return any(_INJECTION_PATTERNS.search(h or "") for h in headlines)
+    # str olmayan başlık (JSON'da sayı/None) çökme yaratmasın (review: string-guard)
+    return any(_INJECTION_PATTERNS.search(str(h) if h is not None else "") for h in headlines)
 
 
 def _sanitize(text: str) -> str:
-    """Tag-injection kapanışı: başlık içindeki açılı ayraçlar tipografik
-    eşdeğerine çevrilir — '</veri>' gömerek veri bloğundan kaçmak imkânsızlaşır."""
+    """Tag-injection kapanışı: açılı ayraçlar tipografik eşdeğerine çevrilir —
+    '</veri>' gömerek veri bloğundan kaçmak imkânsızlaşır."""
     return (text or "").replace("<", "‹").replace(">", "›")
 
 
 def build_veto_user_content(signal: dict, headlines: list[str]) -> str:
-    """Sinyal + başlıkları veri bloğu olarak paketler. Başlıklar asla sistem
-    prompt'una karışamaz; injection savunmasının ikinci katmanı."""
-    headlines = [_sanitize(h) for h in headlines]
+    """Sinyal + başlıkları veri bloğu olarak paketler. Başlıklar VE sinyal alanları
+    asla sistem prompt'una karışamaz; injection savunmasının ikinci katmanı."""
     payload = {
         "sinyal": {
             "pair": signal.get("pair"),
@@ -98,12 +98,14 @@ def build_veto_user_content(signal: dict, headlines: list[str]) -> str:
             "zaman": signal.get("time"),
             "gostergeler": signal.get("indicators", {}),
         },
-        "haber_basliklari": list(headlines),
+        "haber_basliklari": [str(h) if h is not None else "" for h in headlines],
     }
+    # TÜM veri bloğu içeriğini tek noktada sanitize et: JSON syntaks'ında < > yoktur,
+    # o yüzden serileştirilmiş çıktıda < > SADECE string değerlerden gelir (headlines
+    # + sinyal alanları). Böylece hiçbir alan </veri> ile bloktan kaçamaz (review HIGH).
+    body = _sanitize(json.dumps(payload, ensure_ascii=False, indent=1))
     return (
-        "<veri>\n"
-        + json.dumps(payload, ensure_ascii=False, indent=1)
-        + "\n</veri>\n"
+        "<veri>\n" + body + "\n</veri>\n"
         "Yukarıdaki sinyali ve başlıkları değerlendir. Şemaya uygun JSON döndür."
     )
 
@@ -227,27 +229,35 @@ def run_brief(
     mock: bool = False,
     log_path: pathlib.Path | None = None,
 ) -> str:
+    stop_reason = None
     if mock:
         text = "Mock mod: Değişiklik yok."
     else:
         client = _client()
-        response = client.messages.create(
-            model=model or BRIEF_MODEL,
-            max_tokens=1500,
-            system=SYSTEM_BRIEF,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "<veri>\n"
-                    + json.dumps(market, ensure_ascii=False, indent=1)
-                    + "\n</veri>\nGünlük özeti yaz.",
-                }
-            ],
-        )
-        text = next(b.text for b in response.content if b.type == "text")
+        body = _sanitize(json.dumps(market, ensure_ascii=False, indent=1))
+        try:
+            response = client.messages.create(
+                model=model or BRIEF_MODEL,
+                max_tokens=1500,
+                system=SYSTEM_BRIEF,
+                messages=[{"role": "user",
+                           "content": "<veri>\n" + body + "\n</veri>\nGünlük özeti yaz."}],
+            )
+        except Exception as exc:
+            append_log({"type": "brief", "mode": "error", "error": repr(exc)},
+                       log_path or (LOG_DIR / "brief_log.jsonl"))
+            raise
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason == "refusal":
+            text = "Özet üretilemedi (model refusal)."
+        else:
+            # run_veto ile aynı savunma: metin bloğu yoksa çökme değil, dürüst not
+            text = next((b.text for b in response.content if b.type == "text"),
+                        "Özet üretilemedi (cevapta metin yok).")
 
     append_log(
-        {"type": "brief", "mode": "mock" if mock else "live", "text": text},
+        {"type": "brief", "mode": "mock" if mock else "live",
+         "stop_reason": stop_reason, "text": text},
         log_path or (LOG_DIR / "brief_log.jsonl"),
     )
     return text
