@@ -93,6 +93,7 @@ def backtest_cmd(runner: str, trange: str, env_overrides: dict[str, str]) -> lis
             "--strategy", STRATEGY,
             "--timerange", trange,
             "--export", "trades",
+            "--cache", "none",  # cache anahtarı TC_* env'i görmez; cache açıkken ızgara taraması aynı sonucu 20 kez ölçer
         ]
         return cmd
     return [
@@ -101,6 +102,7 @@ def backtest_cmd(runner: str, trange: str, env_overrides: dict[str, str]) -> lis
         "--strategy", STRATEGY,
         "--timerange", trange,
         "--export", "trades",
+        "--cache", "none",
     ]
 
 
@@ -145,7 +147,11 @@ def extract_metrics(data: dict, strategy: str = STRATEGY) -> dict:
                 return s[k]
         return None
 
-    total = g("total_trades", "trades")
+    total = s.get("total_trades")
+    if total is None:
+        # 'trades' alanı sayı değil işlem LİSTESİDİR — sayıya çevir
+        t = s.get("trades")
+        total = len(t) if isinstance(t, list) else None
     wins = s.get("wins")
     return {
         "profit_total": g("profit_total"),          # oran (0.05 = %5)
@@ -215,6 +221,8 @@ def render_walkforward_report(rows: list[dict], out_path: pathlib.Path) -> str:
         f"- **Sonuç: {'GEÇTİ ✅' if verdict_pass else 'KALDI ❌'}** (eşikler yukarıda; H2/F2 kabulü için ayrıca ≥3 sembol + ≥2 rejim şartı geçerli)",
         "",
         "Not: '⚠️ Bozulma' = train penceresi kârlı, hemen ardından gelen test penceresi zararda — rejim bağımlılığı/overfit işareti (Chun & Lee vakasındaki örüntü, kaynakça §4.4).",
+        "",
+        "Metodoloji şerhleri: (1) Parametreler tüm pencerelerde SABİT — pencere-içi optimizasyon yok; parametreleri sensitivity taramasından seçtiysen, tarama yalnız ilk train penceresinde koştuğu sürece bu rapor out-of-sample sayılır. Tarama tüm dönemde koşturulduysa bu rapor OOS DEĞİLDİR (data snooping). (2) Ardışık pencereler sınır günündeki tek mumu paylaşır — etki ihmal edilebilir, sıfır değil.",
     ]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines))
@@ -281,13 +289,15 @@ def main() -> int:
         print(f"\n[wf] rapor: {out}")
         return 0
 
-    # sensitivity: PMax ızgarası, tüm dönem
-    full = timerange(start, end)
+    # sensitivity: PMax ızgarası — SADECE ilk train penceresi (data snooping önlemi:
+    # tüm dönemde taranıp seçilen parametre, walk-forward test pencerelerini "görmüş" olur)
+    holdout = timerange(month_start(start), add_months(month_start(start), args.train_months))
+    print(f"[wf] hassasiyet taraması holdout penceresi: {holdout} (test dönemleri dışarıda)")
     grid_rows = []
     for atr_len in (8, 10, 12, 14):
         for mult in (2.0, 2.5, 3.0, 3.5, 4.0):
             env = {"TC_PMAX_ATR": str(atr_len), "TC_PMAX_MULT": str(mult)}
-            metrics = extract_metrics(run_backtest(args.runner, full, env))
+            metrics = extract_metrics(run_backtest(args.runner, holdout, env))
             grid_rows.append({"atr": atr_len, "mult": mult, "metrics": metrics})
     out = REPORTS_DIR / f"sensitivity_{dt.date.today():%Y%m%d}.md"
     print(render_sensitivity_report(grid_rows, out))

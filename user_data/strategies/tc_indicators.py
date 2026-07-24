@@ -89,6 +89,9 @@ def pmax(
         out = np.zeros(len(src))
         s = src.to_numpy()
         k = vcmo.to_numpy()
+        # Pine'dan bilinçli sapma: Pine nz(VAR[1])=0 ile başlar ve seri fiyata
+        # yakınsayana kadar yüzlerce bar sapık kalır; ilk fiyattan başlatıyoruz.
+        out[0] = s[0] if len(s) else 0.0
         for i in range(1, len(s)):
             a = valpha * k[i]
             out[i] = a * s[i] + (1 - a) * out[i - 1]

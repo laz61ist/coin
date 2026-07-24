@@ -1,5 +1,5 @@
 {
-  "$comment": "F0 config — DRY-RUN zorunlu. dry_run:false yapmak F4 GO/NO-GO kapısından yazılı karar gerektirir (docs/03 §4).",
+  "$comment": "F0 config — DRY-RUN zorunlu. dry_run:false yapmak F4 GO/NO-GO kapısından yazılı karar gerektirir (docs/03 §4). F4 CANLI KONTROL LİSTESİ: (1) stoploss_on_exchange:true + emergency_exit tanımla — bot çökerse stop borsada yaşamalı; (2) api_server kimliklerini FREQTRADE__API_SERVER__* env'ine taşı; (3) docker image'ı belirli sürüme pinle; (4) compose'daki --dry-run bayrağını ancak yazılı GO kararıyla kaldır.",
   "dry_run": true,
   "dry_run_wallet": 1000,
   "trading_mode": "futures",
@@ -41,15 +41,16 @@
     "stoploss_on_exchange": false
   },
   "api_server": {
-    "enabled": true,
-    "listen_ip_address": "0.0.0.0",
+    "$comment": "Varsayılan KAPALI. Açmak için .env'e FREQTRADE__API_SERVER__ENABLED=true + USERNAME/PASSWORD/JWT_SECRET_KEY yaz — kimlik repoya girmez (anayasa §1.2).",
+    "enabled": false,
+    "listen_ip_address": "127.0.0.1",
     "listen_port": 8080,
     "verbosity": "error",
     "enable_openapi": false,
-    "jwt_secret_key": "CHANGE_ME_random_hex",
+    "jwt_secret_key": "",
     "CORS_origins": [],
-    "username": "coin",
-    "password": "CHANGE_ME"
+    "username": "",
+    "password": ""
   },
   "bot_name": "coin-tc5in1",
   "initial_state": "running",

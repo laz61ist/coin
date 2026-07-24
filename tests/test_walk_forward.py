@@ -56,6 +56,22 @@ def test_extract_metrics_missing_strategy():
     assert all(v is None for v in m.values())
 
 
+def test_extract_metrics_trades_list_fallback():
+    # 'trades' sayı değil LİSTE gelir; total_trades yoksa len() kullanılmalı
+    data = {
+        "strategy": {
+            "TC5in1Strategy": {
+                "profit_total": 0.05,
+                "wins": 2,
+                "trades": [{"pair": "BTC/USDT:USDT"}, {"pair": "ETH/USDT:USDT"}],
+            }
+        }
+    }
+    m = wf.extract_metrics(data)
+    assert m["trades"] == 2
+    assert m["winrate"] == 1.0
+
+
 def _row(train_p, test_p, dd=0.05):
     empty = {k: None for k in ("profit_total", "profit_factor", "max_drawdown", "sharpe", "sortino", "trades", "winrate", "market_change")}
     return {

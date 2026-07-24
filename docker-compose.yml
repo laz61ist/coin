@@ -6,11 +6,17 @@ services:
     volumes:
       - ./user_data:/freqtrade/user_data
     env_file:
-      - .env
+      - path: .env
+        required: false
     # Dry-run: gerçek Binance Futures verisi, sahte cüzdan — anahtar gerekmez.
+    # --dry-run bayrağı env/config'ten ÜSTÜNDÜR: .env'e FREQTRADE__DRY_RUN=false
+    # yazılsa bile bot canlıya geçemez. Bayrağı kaldırmak = F4 yazılı GO kararı.
+    # Üretimde image'ı belirli sürüme pinle (ör. freqtradeorg/freqtrade:2026.x) —
+    # walk_forward.py'nin ayrıştırdığı çıktı şeması sürüme bağlıdır.
     command: >
       trade
       --config /freqtrade/user_data/config.futures.json
       --strategy TC5in1Strategy
+      --dry-run
     ports:
       - "127.0.0.1:8080:8080"

@@ -7,13 +7,16 @@ Karar zinciri (docs/03 §2 mimarisi):
 F2 kabulü: bu parametreler walk-forward'dan geçmeden optimize edilmiş sayılmaz.
 """
 
+import logging
 import os
 from datetime import datetime
 
 from freqtrade.strategy import IStrategy, merge_informative_pair
 from pandas import DataFrame
 
-from tc_indicators import linreg_channel, mavilim, nw_envelope, pmax
+from tc_indicators import mavilim, nw_envelope, pmax
+
+logger = logging.getLogger(__name__)
 
 
 class TC5in1Strategy(IStrategy):
@@ -34,7 +37,10 @@ class TC5in1Strategy(IStrategy):
     stoploss = -0.03
     trailing_stop = False
     process_only_new_candles = True
-    startup_candle_count = 900  # 4h EMA200 + NW window için yeterli geçmiş
+    # Isınma bütçesi: NW zarf zinciri 2×500-1 = 999 bar ister; 4h EMA200'ün
+    # ağırlık açığının ihmal edilebilir olması ~600 adet 4h barı = 2400 saat ister.
+    # 900 ile bot canlıda NaN yüzünden hiç sinyal üretmiyordu (review bulgusu).
+    startup_candle_count = 2500
 
     # Kill-switch katmanı (docs/03 §4 F3 tatbikatı bunların üstüne gelir)
     @property
@@ -66,7 +72,10 @@ class TC5in1Strategy(IStrategy):
         informative = self.dp.get_pair_dataframe(
             pair=metadata["pair"], timeframe=self.informative_timeframe
         )
-        informative["ema200"] = informative["close"].ewm(span=200, adjust=False).mean()
+        # min_periods: veri yetersizse sessizce sapmış EMA yerine görünür NaN üret
+        informative["ema200"] = informative["close"].ewm(
+            span=200, adjust=False, min_periods=200
+        ).mean()
         dataframe = merge_informative_pair(
             dataframe, informative, self.timeframe, self.informative_timeframe, ffill=True
         )
@@ -89,8 +98,16 @@ class TC5in1Strategy(IStrategy):
         dataframe["nw_upper"] = nw["nw_upper"]
         dataframe["nw_lower"] = nw["nw_lower"]
 
-        lr = linreg_channel(dataframe["close"], length=100, mult=2.0)
-        dataframe["lr_mid"] = lr["lr_mid"]
+        # NaN bekçisi: kritik kolon son barda NaN ise giriş koşulları sessizce
+        # False'a düşer ve bot "işlem yok" görünür — bunu görünür hataya çevir.
+        critical = ["pmax_dir", "mavw", "nw_upper", f"ema200_{self.informative_timeframe}"]
+        nan_cols = [c for c in critical if dataframe[c].isna().iloc[-1]]
+        if nan_cols:
+            logger.warning(
+                "%s: son barda NaN kolonlar %s — startup_candle_count/veri geçmişi yetersiz, "
+                "bu barda sinyal üretilemez",
+                metadata["pair"], nan_cols,
+            )
 
         return dataframe
 

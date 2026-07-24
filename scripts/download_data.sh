@@ -4,7 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TIMERANGE="${1:-20210101-}"
+# Varsayılan 2020-06: walk-forward 2021-01'den başlar, öndeki ~7 ay startup_candle_count
+# (2500 mum ≈ 104 gün) payıdır — yoksa freqtrade ilk pencereyi sessizce kırpar.
+TIMERANGE="${1:-20200601-}"
 
 docker compose run --rm freqtrade download-data \
   --config /freqtrade/user_data/config.futures.json \
