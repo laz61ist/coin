@@ -160,3 +160,31 @@ class TC5in1Strategy(IStrategy):
     ) -> float:
         # docs/03 §4 F5 risk sözleşmesi: kaldıraç tavanı 3x; başlangıçta 2x sabit
         return min(2.0, max_leverage)
+
+    def confirm_trade_entry(
+        self, pair, order_type, amount, rate, time_in_force,
+        current_time, entry_tag, side, **kwargs,
+    ) -> bool:
+        """SHADOW köprüsü: giriş anında LLM görüşünü LOGLAR ama emri ASLA engellemez.
+
+        TC_LLM_SHADOW=true iken llm_advisor.run_veto çağrılır; çıktı jsonl'a yazılır,
+        dönüş her zaman True'dur (emir yetkisi yok — docs/03 §2 + kaynakça §5).
+        Kapalıysa (varsayılan) veya hata olursa sessizce izin ver — bot durmasın.
+        """
+        if os.getenv("TC_LLM_SHADOW", "").lower() in ("1", "true", "yes"):
+            try:
+                import sys as _sys
+                _root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                if _root not in _sys.path:
+                    _sys.path.insert(0, _root)
+                from llm_advisor.advisor import run_veto
+
+                run_veto(
+                    signal={"pair": pair, "side": side, "time": str(current_time),
+                            "indicators": {"rate": float(rate)}},
+                    headlines=[],  # haber kaynağı entegrasyonu sonraki adım
+                    mock=os.getenv("TC_LLM_MOCK", "").lower() in ("1", "true", "yes"),
+                )
+            except Exception as exc:  # shadow katman botu ASLA düşürmez
+                logger.warning("shadow veto atlandı (%s): %s", pair, exc)
+        return True  # emir yetkisi YOK — giriş her zaman onaylanır

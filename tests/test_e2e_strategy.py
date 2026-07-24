@@ -153,6 +153,32 @@ def test_protections_shape_contract():
     assert dd["max_allowed_drawdown"] <= 0.20  # docs/03 kill-switch sözleşmesi
 
 
+def test_shadow_hook_logs_but_always_allows(monkeypatch, tmp_path):
+    """LLM shadow köprüsü: girişi ASLA engellemez, ama açıkken görüşü loglar."""
+    import importlib
+    import llm_advisor.advisor as adv
+    importlib.reload(adv)
+    log = tmp_path / "veto.jsonl"
+    monkeypatch.setattr(adv, "LOG_DIR", tmp_path)
+    monkeypatch.setenv("TC_LLM_SHADOW", "true")
+    monkeypatch.setenv("TC_LLM_MOCK", "true")  # ağsız
+    strat = TC5in1Strategy({"stake_currency": "USDT", "trading_mode": "futures"})
+    import datetime as _dt
+    ok = strat.confirm_trade_entry(
+        pair=PAIR, order_type="limit", amount=1.0, rate=100.0,
+        time_in_force="gtc", current_time=_dt.datetime(2026, 7, 24), entry_tag=None, side="long",
+    )
+    assert ok is True                       # emir HER ZAMAN onaylanır (shadow)
+    assert (tmp_path / "veto_log.jsonl").exists()  # görüş loglandı
+
+    # kapalıyken (varsayılan) hiç LLM çağrısı yok, yine izin verir
+    monkeypatch.delenv("TC_LLM_SHADOW", raising=False)
+    assert strat.confirm_trade_entry(
+        pair=PAIR, order_type="limit", amount=1.0, rate=100.0,
+        time_in_force="gtc", current_time=_dt.datetime(2026, 7, 24), entry_tag=None, side="short",
+    ) is True
+
+
 def test_no_lookahead_at_strategy_level():
     """Strateji-seviyesi repaint sözleşmesi: seri kısaltılınca geçmiş sinyaller değişmez.
 
