@@ -1,0 +1,18 @@
+{
+  "signal": {
+    "pair": "BTC/USDT:USDT",
+    "side": "long",
+    "time": "2026-07-24T09:00:00Z",
+    "indicators": {
+      "pmax_dir": 1,
+      "mavw_rising": true,
+      "close": 118250.5,
+      "ema200_4h": 112400.0,
+      "nw_upper": 121800.0
+    }
+  },
+  "headlines": [
+    "Bitcoin spot ETF'lerine haftalık net giriş 1.2 milyar dolar",
+    "Fed faiz kararını değiştirmedi, piyasalar sakin"
+  ]
+}

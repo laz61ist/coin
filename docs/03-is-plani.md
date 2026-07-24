@@ -74,6 +74,7 @@ Binance Futures testnet'te kesintisiz çalışma; state dosyası + idempotency; 
 Kabul: H3; ayrıca kill switch tatbikatı — simüle -%15'te pozisyonlar kapanıyor, bot duruyor, bildirim geliyor.
 
 ### F4 — AI karar destek katmanı (2-3 hafta, F3 ile paralel başlayabilir)
+**Araç durumu:** `llm_advisor/` paketi hazır — shadow-mode veto + günlük brief CLI'ı (`python3 -m llm_advisor.cli`), structured-output şemalı Anthropic SDK entegrasyonu, prompt-injection savunması (sabit sistem prompt + `<veri>` bloğu + injection_suspected bayrağı), jsonl shadow log. Katkı ölçümü (aşağıdaki kabul) log üzerinden yapılacak.
 LLM servisi ayrı süreç: (a) günlük piyasa brief'i, (b) sinyal geldiğinde haber taraması → "veto/nötr/destek" etiketi + tek paragraf gerekçe, (c) haftalık performans anlatısı. Look-ahead bias dersi (Glasserman-Lin): LLM'e yalnız sinyal anına kadarki bilgi verilir; geçmiş test yaparken model bilgi-kesim tarihi sonrası dönem kullanılır (Lopez-Lira & Tang deseni).
 Kabul: veto mekanizması backtest'te ölçülmüş — LLM vetosu net katkı sağlamıyorsa katman "sadece rapor" moduna düşürülür (dürüstlük: katkıyı varsayma, ölç).
 

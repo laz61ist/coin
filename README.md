@@ -42,6 +42,19 @@ python3 scripts/walk_forward.py --mode sensitivity   # PMax parametre ızgarası
 
 Rapor kuralları: pozitif test penceresi ≥ %50 ve pencere MDD ≤ %20 değilse **KALDI** damgası; train kârlı + test zararda pencereler ⚠️ ile işaretlenir (overfit/rejim bağımlılığı işareti). Kabul için ayrıca ≥3 sembol + ≥2 rejim şartı geçerli (docs/03 §4 F2). Hassasiyet taraması bilinçli olarak yalnız İLK train penceresinde koşar (data snooping önlemi) ve tüm backtest'ler `--cache none` ile çalışır.
 
+## F4 — LLM karar destek (shadow mode)
+
+```bash
+# Ağsız duman testi (API key gerekmez):
+python3 -m llm_advisor.cli veto --input llm_advisor/examples/sinyal_ornek.json --mock
+
+# Gerçek çağrı (.env'e ANTHROPIC_API_KEY yaz):
+python3 -m llm_advisor.cli veto --input llm_advisor/examples/sinyal_ornek.json
+python3 -m llm_advisor.cli brief --input durum.json
+```
+
+Kurallar: LLM'in **emir yetkisi yok** — görüşü (`destek/notr/veto`) sadece `logs/llm_advisor/*.jsonl`'a yazılır; F4 kabulünde katkısı bu logla ölçülür, katkı yoksa katman "sadece rapor" moduna düşer (docs/03 §4). Haber başlıkları `<veri>` bloğunda veri olarak gider; içine gömülü talimatlar uygulanmaz, `injection_suspected` bayrağıyla işaretlenir. Model kademesi: brief=Haiku 4.5, veto=Sonnet 5, haftalık derin review=Opus 4.8 (`TC_LLM_*_MODEL` env'leriyle değiştirilebilir).
+
 ## E2E testler
 
 İki katman:
