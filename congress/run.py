@@ -129,7 +129,9 @@ def run_once(
     }
 
 
-def render_report(result: dict, out_dir: pathlib.Path = REPORT_DIR) -> pathlib.Path:
+def render_report(result: dict, out_dir: pathlib.Path | None = None) -> pathlib.Path:
+    # None -> modül değişkenini ÇAĞRI ANINDA oku (monkeypatch/override çalışsın)
+    out_dir = out_dir if out_dir is not None else REPORT_DIR
     lines = [f"# Kongre Kopyalama Raporu — {result['asof']}", "", LAG_WARNING, ""]
     if result.get("kill_switch"):
         lines += [f"## 🛑 {result['message']}", f"- Equity: {result['equity']}",
