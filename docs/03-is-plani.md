@@ -126,7 +126,14 @@ Hafta:  1    2  3    4  5    6 ... 13   14        15+
         F6 bağımsız: herhangi bir 2 haftalık boşlukta
 ```
 
-## 9. Türkiye regülasyon durumu
+## 9. Türkiye regülasyon durumu (Temmuz 2026 — detay ve kaynaklar: kaynakça §7)
 
-> Workflow'un 2 bağımsız adversarial doğrulayıcısı henüz sonuç döndürmedi — bu bölüm doğrulanmış iddialarla güncellenecek. `[BEKLEMEDE]`
-> Şimdiden kesin olan tek kural: bu bölümdeki hiçbir şey hukuki/vergisel danışmanlık yerine geçmez; canlıya geçiş (F4 kapısı) öncesi güncel mevzuat kontrolü şarttır.
+**Hiçbiri hukuki/vergisel danışmanlık değildir; canlıya geçiş (F4 kapısı) öncesi güncel mevzuat + mali müşavir kontrolü şarttır.**
+
+Plan kararlarını etkileyen beş bulgu:
+
+1. **TR'de yasal kripto futures ürünü yok.** SPK lisanslı platformlarda kaldıraç/türev/açığa satış yasak (7518 + III-35/B tebliğleri). Hat B zorunlu olarak yurt dışı platformda (global Binance) çalışır; kendi hesabına işlem yapan bireye ceza öngören hüküm yok, ama hukuki koruma da yok ve SPK uyumsuz platformlara erişim engeli uygulayabiliyor. → Plana eklenen kural: **borsa-taşınabilirlik (ccxt) baştan mimaride** ve VPN'siz erişilebilirlik F3 izleme metriğine dahil.
+2. **TRY giriş-çıkışı Binance TR üzerinden** (Kasım 2025'te TRY pariteleri oraya taşındı; çekimlerde 72 saat bekleme var). Fonlama akışı: TR bankası → Binance TR (spot, TRY→USDT) → global hesaba transfer. 72 saat kuralı acil çekim senaryosuna eklendi (risk kaydı).
+3. **Vergi belirsiz ama gelmesi muhtemel.** Temmuz 2026 itibarıyla kriptoya özel vergi yürürlükte değil; Mart 2026'daki %10 stopaj + işlem vergisi teklifi geri çekildi, yeniden gelmesi bekleniyor. → GO/NO-GO kararında getiri hedefi **%10 stopaj senaryosuyla** stres-testlenir; işlem kayıtları vergi beyanına hazır formatta tutulur (zaten loglanıyor).
+4. **Hat A (Alpaca paper) TR'den tamamen yasal ve ücretsiz** — paper hesap KYC'siz, sadece e-posta. Canlı ABD hisse hesabı istenirse Alpaca'nın Türkiye uygunluğu tek kaynaklı `[DOĞRULANMASI GEREKİYOR]`; alternatif TR aracı kurumları üzerinden ABD piyasası erişimi.
+5. **Sinyal satışı / başkasının parasını yönetmek kırmızı çizgi:** SPK lisansı olmadan suç (izinsiz sermaye piyasası faaliyeti / izinsiz KVHS). Kendi hesabına algo-trading serbest. Proje çıktısı hiçbir aşamada üçüncü kişiye sinyal/yönetim hizmetine dönüştürülmez.
