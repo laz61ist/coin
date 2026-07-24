@@ -32,4 +32,14 @@ python -m pytest tests/ -q    # 7 test: davranış + no-lookahead (repaint) söz
 
 Kod haritası: `user_data/strategies/tc_indicators.py` (Pine 5in1 portu — Mavilim, PMax, NW-endpoint, Linreg-endpoint), `user_data/strategies/TC5in1Strategy.py` (confluence: 4h EMA200 rejim → PMax tetik → Mavilim teyit → NW veto; MaxDrawdown %15 kill-switch; kaldıraç 2x sabit), `user_data/config.futures.json` (dry-run zorunlu).
 
+## F2 — Backtest disiplini
+
+```bash
+./scripts/download_data.sh 20210101-        # 1h+4h futures verisi (funding dahil)
+python3 scripts/walk_forward.py             # train 6ay / test 2ay kaydırmalı; reports/ altına Markdown rapor
+python3 scripts/walk_forward.py --mode sensitivity   # PMax parametre ızgarası + cliff uyarısı
+```
+
+Rapor kuralları: pozitif test penceresi ≥ %50 ve pencere MDD ≤ %20 değilse **KALDI** damgası; train kârlı + test zararda pencereler ⚠️ ile işaretlenir (overfit/rejim bağımlılığı işareti). Kabul için ayrıca ≥3 sembol + ≥2 rejim şartı geçerli (docs/03 §4 F2).
+
 Uyarı: Bu depo araştırma/plan dokümanıdır; yatırım tavsiyesi değildir. Kaldıraçlı kripto türevlerinde anapara tamamen kaybedilebilir. `dry_run:false` yapmak F4 GO/NO-GO kapısından yazılı karar gerektirir (docs/03 §4).

@@ -67,6 +67,7 @@ Kabul: H1 ölçütü; repaint testi — sinyal, bar kapandıktan sonra asla değ
 ### F2 — Backtest disiplini (2 hafta)
 Confluence iskeleti (04 §6) freqtrade stratejisi olarak; komisyon + funding + slippage modelli; **walk-forward** (örn. 6 ay train / 2 ay test kaydırmalı); en az 3 sembol (BTC, ETH + 1 alt), en az 2 rejim (trend + yatay) dönemi.
 Kabul: H2; tek-dönem optimize edilmiş parametrelerin komşu dönemde çökmediği gösterilmiş (overfit raporu, Gort ve ark. dersi).
+**Araç durumu:** `scripts/walk_forward.py` hazır (pencere üretimi + koşu + Markdown rapor + GEÇTİ/KALDI eşikleri) ve `--mode sensitivity` ile PMax parametre-ızgara/cliff taraması; pencere-başına hyperopt (gerçek WFO) F2b olarak ayrıldı.
 
 ### F3 — Testnet/dry-run maratonu (8+ hafta, paralel geliştirmeyle)
 Binance Futures testnet'te kesintisiz çalışma; state dosyası + idempotency; Telegram/e-posta günlük özet ("değişiklik yok" günü tek satır).

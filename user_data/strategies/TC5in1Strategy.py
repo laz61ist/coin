@@ -7,6 +7,7 @@ Karar zinciri (docs/03 §2 mimarisi):
 F2 kabulü: bu parametreler walk-forward'dan geçmeden optimize edilmiş sayılmaz.
 """
 
+import os
 from datetime import datetime
 
 from freqtrade.strategy import IStrategy, merge_informative_pair
@@ -17,6 +18,12 @@ from tc_indicators import linreg_channel, mavilim, nw_envelope, pmax
 
 class TC5in1Strategy(IStrategy):
     INTERFACE_VERSION = 3
+
+    # scripts/walk_forward.py --mode sensitivity bu değişkenlerle ızgara tarar
+    PMAX_ATR = int(os.getenv("TC_PMAX_ATR", "10"))
+    PMAX_MULT = float(os.getenv("TC_PMAX_MULT", "3.0"))
+    PMAX_MA_LEN = int(os.getenv("TC_PMAX_MA_LEN", "9"))
+    NW_BANDWIDTH = float(os.getenv("TC_NW_BW", "8.0"))
 
     timeframe = "1h"
     informative_timeframe = "4h"
@@ -65,14 +72,20 @@ class TC5in1Strategy(IStrategy):
         )
 
         # --- 1h sinyal katmanı ---
-        pm = pmax(dataframe, atr_length=10, multiplier=3.0, ma_length=9, ma_type="EMA")
+        pm = pmax(
+            dataframe,
+            atr_length=self.PMAX_ATR,
+            multiplier=self.PMAX_MULT,
+            ma_length=self.PMAX_MA_LEN,
+            ma_type="EMA",
+        )
         dataframe["pmax"] = pm["pmax"]
         dataframe["pmax_dir"] = pm["pmax_dir"]
 
         dataframe["mavw"] = mavilim(dataframe["close"])
         dataframe["mavw_rising"] = dataframe["mavw"] > dataframe["mavw"].shift(1)
 
-        nw = nw_envelope(dataframe["close"], bandwidth=8.0, window=500, mult=3.0)
+        nw = nw_envelope(dataframe["close"], bandwidth=self.NW_BANDWIDTH, window=500, mult=3.0)
         dataframe["nw_upper"] = nw["nw_upper"]
         dataframe["nw_lower"] = nw["nw_lower"]
 
