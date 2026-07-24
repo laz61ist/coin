@@ -8,6 +8,7 @@ Araştırma ve planlama dokümanları (branch: `claude/trading-ai-decision-syste
 | [docs/02-arastirma-kaynakca.md](docs/02-arastirma-kaynakca.md) | 25 GitHub repo (sayfadan doğrulanmış) + 23 akademik makale (derin pass: repo-doğrulamalı, çelişki haritalı) + TR regülasyon + veri ekosistemi |
 | [docs/03-is-plani.md](docs/03-is-plani.md) | İki hatlı iş planı: Binance Futures AI karar sistemi (ana) + Kongre kopyalama Alpaca paper (yan); F0-F6 fazlar, GO/NO-GO kapısı, risk kaydı, maliyet |
 | [docs/04-pine-inceleme.md](docs/04-pine-inceleme.md) | "Trader Club 5in1" Pine Script incelemesi: bug listesi, repaint riskleri, Python port tablosu, confluence iskeleti |
+| [docs/05-operasyon-runbook.md](docs/05-operasyon-runbook.md) | F3 dry-run maratonu işletim kılavuzu: başlatma kilidi, günlük/haftalık kontrol listesi, kill-switch tatbikatı, hata kurtarma tablosu, GO/NO-GO kapısı |
 
 ## Üç cümlelik özet
 
