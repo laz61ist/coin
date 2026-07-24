@@ -86,6 +86,7 @@ Kaybı tamamen göze alınan tutar; kaldıraç ≤ 3x; pozisyon başına risk �
 Kabul: 4 hafta boyunca risk sözleşmesinden sıfır sapma; sapma = otomatik F3'e dönüş.
 
 ### F6 — Hat A: Kongre kopyalama (Alpaca paper) (2 hafta, bağımsız)
+**Araç durumu:** `congress/` paketi hazır — senate-stock-watcher veri adaptörü, açıklama-tarihli sıralama (`--assumed-lag-days`, varsayılan 26), midpoint hedef portföy (+%10 tavan/%20 nakit), delta-emir idempotency, HWM -%15 kill switch, paper-URL bekçisi, 45-gün şerhli Markdown rapor, `--leader-filter` (F6b) bayrağı. docs/01 §3'ün 4 kabul kriteri test paketinde birebir kilitli (`tests/test_congress.py`).
 `docs/01-prompt-analizi.md`'deki geliştirilmiş prompt uygulanır: veri = House Clerk ZIP+XML (en makine-dostu resmî kaynak) + Senate eFD; kolaylık katmanı congress-trading-monitor/QuiverQuant; sıralama metodolojisi açıklama-tarihli; delta-emir idempotency; her raporda 45-gün gecikme şerhi (pratik medyan ~26 gün).
 Kabul: 01 §3'teki 4 kabul kriteri; ek: NANC/SPY kıyas satırı raporda.
 **F6b (opsiyonel araştırma deneyi):** Literatürdeki tek test edilmemiş açık kapıyı paper'da dene — genel kopyalama yerine **lider-filtreli kopya** (yalnız parti liderliği pozisyonundaki üyelerin işlemleri; Wei-Zhou 2025 mekanizma ufku 3-12 ay olduğundan 45 günlük gecikmeyi aşabilir). Bu, para beklentisi değil yayınlanabilir bir deney: sonuç ne çıkarsa çıksın değerli (kaynakça §6 net karar).

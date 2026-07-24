@@ -55,6 +55,26 @@ python3 -m llm_advisor.cli brief --input durum.json
 
 Kurallar: LLM'in **emir yetkisi yok** — görüşü (`destek/notr/veto`) sadece `logs/llm_advisor/*.jsonl`'a yazılır; F4 kabulünde katkısı bu logla ölçülür, katkı yoksa katman "sadece rapor" moduna düşer (docs/03 §4). Haber başlıkları `<veri>` bloğunda veri olarak gider; içine gömülü talimatlar uygulanmaz, `injection_suspected` bayrağıyla işaretlenir. Model kademesi: brief=Haiku 4.5, veto=Sonnet 5, haftalık derin review=Opus 4.8 (`TC_LLM_*_MODEL` env'leriyle değiştirilebilir).
 
+## F6 — Kongre kopyalama hattı (Alpaca paper)
+
+```bash
+# Veri indir (senate-stock-watcher aggregate, ~50MB):
+curl -L -o data/all_transactions.json \
+  https://raw.githubusercontent.com/timothycarambat/senate-stock-watcher-data/master/aggregate/all_transactions.json
+
+# DRY-RUN (varsayılan — hiçbir emir gönderilmez; fiyatlar yfinance'ten):
+pip install yfinance requests
+python3 -m congress.run --data data/all_transactions.json
+
+# Paper emirleri gönder (.env'de ALPACA_* dolu olmalı; URL 'paper' içermezse bot çalışmayı reddeder):
+python3 -m congress.run --data data/all_transactions.json --approve
+
+# F6b lider-filtre deneyi (satır başına bir üye adı):
+python3 -m congress.run --data data/all_transactions.json --leader-filter data/leaders.txt
+```
+
+Metodoloji dürüstlüğü kodda: getiriler **açıklama-tarihli** hesaplanır (veri setinde açıklama tarihi yoksa işlem tarihi + 26 gün medyan gecikme, `--assumed-lag-days` ile ayarlanır); her raporun başında 45-gün STOCK Act şerhi zorunlu; delta-emir idempotency (aynı hedefe ikinci koşu = sıfır emir); ticker başına %10 tavan + %20 nakit tamponu; HWM'den -%15'te kill switch. Bu hat portfolyo/deney projesidir — kaynakça §6: genel kopyalamada risk-ayarlı alfa yok.
+
 ## E2E testler
 
 İki katman:

@@ -15,6 +15,9 @@ user_data/plot/
 # LLM advisor shadow logları (yerel kalır)
 logs/
 
+# Hat A durum dosyası + indirilen veri setleri (yerel kalır)
+data/
+
 # Python
 __pycache__/
 *.pyc
