@@ -40,6 +40,21 @@ python3 scripts/walk_forward.py             # train 6ay / test 2ay kaydırmalı;
 python3 scripts/walk_forward.py --mode sensitivity   # PMax parametre ızgarası + cliff uyarısı
 ```
 
-Rapor kuralları: pozitif test penceresi ≥ %50 ve pencere MDD ≤ %20 değilse **KALDI** damgası; train kârlı + test zararda pencereler ⚠️ ile işaretlenir (overfit/rejim bağımlılığı işareti). Kabul için ayrıca ≥3 sembol + ≥2 rejim şartı geçerli (docs/03 §4 F2).
+Rapor kuralları: pozitif test penceresi ≥ %50 ve pencere MDD ≤ %20 değilse **KALDI** damgası; train kârlı + test zararda pencereler ⚠️ ile işaretlenir (overfit/rejim bağımlılığı işareti). Kabul için ayrıca ≥3 sembol + ≥2 rejim şartı geçerli (docs/03 §4 F2). Hassasiyet taraması bilinçli olarak yalnız İLK train penceresinde koşar (data snooping önlemi) ve tüm backtest'ler `--cache none` ile çalışır.
+
+## E2E testler
+
+İki katman:
+
+```bash
+# Katman 1 — ağsız, strateji zinciri gerçek freqtrade API'siyle (CI'da da koşar):
+pip install freqtrade pytest && python -m pytest tests/ -q
+# freqtrade kurulu değilse e2e otomatik atlanır, 22 birim test yine koşar
+
+# Katman 2 — tam yığın (senin makinende, ağ + docker gerekir, ~10 dk):
+./scripts/e2e_smoke.sh   # veri indir → backtest → parser doğrulama → 60sn dry-run
+```
+
+Katman 1'in içerdiği sözleşmeler: ısınma sonrası kritik kolonlarda NaN yok (canlıda sessiz-susma bug'ının regresyon kilidi), her iki rejimde sinyal üretimi, giriş maskesi = dokümante confluence mantığı, strateji-seviyesi no-lookahead (seri kısaltılınca kapanmış barların sinyalleri değişmiyor).
 
 Uyarı: Bu depo araştırma/plan dokümanıdır; yatırım tavsiyesi değildir. Kaldıraçlı kripto türevlerinde anapara tamamen kaybedilebilir. `dry_run:false` yapmak F4 GO/NO-GO kapısından yazılı karar gerektirir (docs/03 §4).
