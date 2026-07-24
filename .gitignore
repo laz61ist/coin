@@ -1,0 +1,19 @@
+# Secrets — asla commit edilmez (anayasa §1.2)
+.env
+*.key
+*.pem
+
+# Freqtrade çalışma verileri
+user_data/data/
+user_data/logs/
+user_data/backtest_results/
+user_data/plot/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

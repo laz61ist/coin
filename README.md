@@ -15,4 +15,21 @@ Araştırma ve planlama dokümanları (branch: `claude/trading-ai-decision-syste
 2. **LLM'e emir yetkisi verilmez**: parlak LLM-trading rakamları bağımsız denetimlerde (FINSABER, Profit Mirage) çöküyor; LLM haber/rejim/rapor katmanında, kararı kurallı sinyal + risk motoru verir.
 3. **Önce süreç, sonra sermaye**: walk-forward backtest → 8+ hafta testnet → yazılı GO/NO-GO kapısı → ancak ondan sonra mikro-sermaye.
 
-Uyarı: Bu depo araştırma/plan dokümanıdır; yatırım tavsiyesi değildir. Kaldıraçlı kripto türevlerinde anapara tamamen kaybedilebilir.
+## Hızlı başlangıç (F0 — dry-run, API key gerekmez)
+
+```bash
+cp .env.example .env          # anahtarlar boş kalabilir; dry-run public veriyle çalışır
+docker compose up -d          # bot: TC5in1Strategy, Binance USDT-M, sahte 1000 USDT
+docker compose logs -f freqtrade
+```
+
+Sinyal kütüphanesi testleri (freqtrade gerekmez):
+
+```bash
+pip install pandas numpy pytest
+python -m pytest tests/ -q    # 7 test: davranış + no-lookahead (repaint) sözleşmesi
+```
+
+Kod haritası: `user_data/strategies/tc_indicators.py` (Pine 5in1 portu — Mavilim, PMax, NW-endpoint, Linreg-endpoint), `user_data/strategies/TC5in1Strategy.py` (confluence: 4h EMA200 rejim → PMax tetik → Mavilim teyit → NW veto; MaxDrawdown %15 kill-switch; kaldıraç 2x sabit), `user_data/config.futures.json` (dry-run zorunlu).
+
+Uyarı: Bu depo araştırma/plan dokümanıdır; yatırım tavsiyesi değildir. Kaldıraçlı kripto türevlerinde anapara tamamen kaybedilebilir. `dry_run:false` yapmak F4 GO/NO-GO kapısından yazılı karar gerektirir (docs/03 §4).
