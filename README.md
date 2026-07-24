@@ -62,18 +62,21 @@ Kurallar: LLM'in **emir yetkisi yok** — görüşü (`destek/notr/veto`) sadece
 curl -L -o data/all_transactions.json \
   https://raw.githubusercontent.com/timothycarambat/senate-stock-watcher-data/master/aggregate/all_transactions.json
 
-# DRY-RUN (varsayılan — hiçbir emir gönderilmez; fiyatlar yfinance'ten):
+# Keysiz/ağsız simülasyon önizlemesi (--fake-equity ile sahte hesap):
+python3 -m congress.run --data data/all_transactions.json --prices-json data/prices.json --fake-equity 1000
+
+# DRY-RUN — GERÇEK paper hesabı OKUR (equity/pozisyon), emir GÖNDERMEZ (.env'de ALPACA_* gerekir):
 pip install yfinance requests
 python3 -m congress.run --data data/all_transactions.json
 
-# Paper emirleri gönder (.env'de ALPACA_* dolu olmalı; URL 'paper' içermezse bot çalışmayı reddeder):
+# Paper emirleri gönder (URL 'paper' içermezse bot çalışmayı reddeder):
 python3 -m congress.run --data data/all_transactions.json --approve
 
 # F6b lider-filtre deneyi (satır başına bir üye adı):
 python3 -m congress.run --data data/all_transactions.json --leader-filter data/leaders.txt
 ```
 
-Metodoloji dürüstlüğü kodda: getiriler **açıklama-tarihli** hesaplanır (veri setinde açıklama tarihi yoksa işlem tarihi + 26 gün medyan gecikme, `--assumed-lag-days` ile ayarlanır); her raporun başında 45-gün STOCK Act şerhi zorunlu; delta-emir idempotency (aynı hedefe ikinci koşu = sıfır emir); ticker başına %10 tavan + %20 nakit tamponu; HWM'den -%15'te kill switch. Bu hat portfolyo/deney projesidir — kaynakça §6: genel kopyalamada risk-ayarlı alfa yok.
+Kapsam: **yalnızca Senato** (veri şeması gereği; House ayrı parser ister). Metodoloji dürüstlüğü kodda ve testte kilitli: getiriler **açıklama-tarihli** + **FIFO lot eşleme** ile hesaplanır (kısmi satış tüm pozisyonu kapatmaz; işlem tarihi + 26 gün medyan gecikme, `--assumed-lag-days`); `Sale (Full)` pozisyonu sıfırlar (phantom pozisyon yok); min_trades yalnız son 12 aya bakar; hedef portföyde ticker başına %10 tavan + %20 nakit + water-filling (yatırılamayan bakiye raporlanır); delta broker'ın **gerçek** pozisyonlarından hesaplanır (lider değişince eski pozisyon otomatik satılır); **kill switch pozisyonları fiilen tasfiye eder ve kalıcı `halted` olur** (equity toparlansa bile manuel reset şart); short-sell guard yalnız-long kuralını korur. Her raporda 45-gün STOCK Act şerhi zorunlu. Bu hat portfolyo/deney projesidir — kaynakça §6: genel kopyalamada risk-ayarlı alfa yok.
 
 ## E2E testler
 

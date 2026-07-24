@@ -29,42 +29,71 @@ def _parse_date(text: str) -> dt.date:
 
 
 def normalize_senate_watcher(record: dict) -> dict | None:
-    """senate-stock-watcher formatındaki tek kaydı normalize eder.
+    """senate-stock-watcher formatındaki tek kaydı normalize eder (yalnız Senato).
 
-    Sadece hisse (Stock) ve geçerli ticker'lı kayıtlar; diğerleri None.
-    disclosure_date bu veri setinde yok -> None (ranking varsayılan gecikme uygular).
+    NOT: bu şemada yalnızca 'senator' alanı vardır; House verisi ayrı bir kaynak
+    ve parser gerektirir (docs/03 §F6 — hat şu an Senato-only). Hata sebeplerini
+    ayırt etmek için ValueError yerine (None, reason) döndüren _try sürümü kullanılır.
     """
+    result, _ = _try_normalize(record)
+    return result
+
+
+def _try_normalize(record: dict) -> tuple[dict | None, str | None]:
     if (record.get("asset_type") or "").strip() != "Stock":
-        return None
+        return None, "not_stock"
     ticker = (record.get("ticker") or "").strip()
-    if not ticker or ticker in ("--", "N/A") or len(ticker) > 6:
-        return None
-    ttype = (record.get("type") or "").lower()
+    if not ticker or ticker in ("--", "N/A"):
+        return None, "invalid_ticker"
+    # meşru gösterim: harf(ler) + opsiyonel tek . veya - + harf(ler) (BRK.B, RDS-A)
+    if not re.fullmatch(r"[A-Za-z]{1,6}([.\-][A-Za-z]{1,3})?", ticker):
+        return None, "invalid_ticker"
+    ttype_raw = (record.get("type") or "").strip()
+    ttype = ttype_raw.lower()
     if "purchase" in ttype:
-        side = "buy"
+        side, is_full_exit = "buy", False
     elif "sale" in ttype:
         side = "sell"
+        is_full_exit = "full" in ttype  # 'Sale (Full)' pozisyonu kapatır
     else:
-        return None
+        return None, "unknown_type"
     try:
         _, _, mid = parse_amount_range(record.get("amount", ""))
+    except ValueError:
+        return None, "unparseable_amount"
+    try:
         tdate = _parse_date(record.get("transaction_date", ""))
     except ValueError:
-        return None
+        return None, "unparseable_date"
+    member = (record.get("senator") or record.get("representative") or "").strip()
+    if not member:
+        return None, "no_member"
     return {
-        "member": (record.get("senator") or record.get("representative") or "").strip(),
+        "member": member,
         "ticker": ticker,
         "side": side,
+        "is_full_exit": is_full_exit,
         "transaction_date": tdate,
         "disclosure_date": None,
         "amount_mid": mid,
-    }
+        "raw_type": ttype_raw,
+    }, None
 
 
 def load_trades(records: list[dict]) -> list[dict]:
-    out = []
+    """Geriye dönük uyumlu: yalnız geçerli kayıtları döndürür."""
+    trades, _ = load_trades_with_stats(records)
+    return trades
+
+
+def load_trades_with_stats(records: list[dict]) -> tuple[list[dict], dict]:
+    """Geçerli kayıtlar + hangi sebeple kaç kaydın düştüğünü raporlar (izlenebilirlik)."""
+    out: list[dict] = []
+    dropped: dict[str, int] = {}
     for r in records:
-        n = normalize_senate_watcher(r)
-        if n and n["member"]:
+        n, reason = _try_normalize(r)
+        if n is not None:
             out.append(n)
-    return out
+        else:
+            dropped[reason] = dropped.get(reason, 0) + 1
+    return out, dropped

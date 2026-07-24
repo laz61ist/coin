@@ -7,12 +7,38 @@ canlı endpoint'e karşı çalışmayı yapısal olarak engeller. Anahtarlar .en
 from __future__ import annotations
 
 import os
+import time
 
 import requests
+
+_RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
 class NotPaperEndpointError(RuntimeError):
     pass
+
+
+class ShortSellBlockedError(RuntimeError):
+    """Yalnız-long mirror kuralı: mevcut pozisyondan fazla satış short açardı."""
+
+
+def _request_with_retry(method, url, *, headers, json=None, timeout=30, retries=3):
+    last = None
+    for attempt in range(retries):
+        try:
+            r = requests.request(method, url, headers=headers, json=json, timeout=timeout)
+            if r.status_code in _RETRY_STATUS:
+                last = requests.HTTPError(f"{r.status_code} retryable", response=r)
+            else:
+                r.raise_for_status()
+                return r
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last = exc
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
+    if isinstance(last, requests.HTTPError):
+        last.response.raise_for_status()
+    raise last
 
 
 class AlpacaPaper:
@@ -29,34 +55,32 @@ class AlpacaPaper:
             "APCA-API-SECRET-KEY": secret or os.getenv("ALPACA_SECRET_KEY", ""),
         }
 
-    def _get(self, path: str):
-        r = requests.get(f"{self.base_url}{path}", headers=self._headers, timeout=30)
-        r.raise_for_status()
-        return r.json()
-
     def account_equity(self) -> float:
-        return float(self._get("/v2/account")["equity"])
+        r = _request_with_retry("GET", f"{self.base_url}/v2/account", headers=self._headers)
+        return float(r.json()["equity"])
 
     def positions_usd(self) -> dict[str, float]:
-        return {p["symbol"]: float(p["market_value"]) for p in self._get("/v2/positions")}
+        r = _request_with_retry("GET", f"{self.base_url}/v2/positions", headers=self._headers)
+        return {p["symbol"]: float(p["market_value"]) for p in r.json()}
 
     def submit_notional_order(self, ticker: str, usd: float, side: str) -> dict:
-        # v1: notional market/day emri. docs/01'deki limit ±%0.5 kuralından bilinçli
-        # sapma — Alpaca notional emirle limit'i birleştirmez; paper fazında kabul,
-        # canlı öncesi yeniden değerlendirilecek (rapora not düşülür).
-        r = requests.post(
-            f"{self.base_url}/v2/orders",
-            headers=self._headers,
+        # Yalnız-long guard: sell tutarı mevcut pozisyonu aşamaz (short'u engelle, bulgu #13)
+        if side == "sell":
+            held = self.positions_usd().get(ticker, 0.0)
+            if usd > held + 1e-6:
+                raise ShortSellBlockedError(
+                    f"{ticker}: sell ${usd} > mevcut ${held}; yalnız-long kuralı"
+                )
+        r = _request_with_retry(
+            "POST", f"{self.base_url}/v2/orders", headers=self._headers,
             json={"symbol": ticker, "notional": round(usd, 2), "side": side,
                   "type": "market", "time_in_force": "day"},
-            timeout=30,
         )
-        r.raise_for_status()
         return r.json()
 
 
 class FakeAlpaca:
-    """Test/dry-run ikamesi: emirleri sadece kaydeder."""
+    """Test/dry-run ikamesi: pozisyonları gerçekçi tutar (buy artırır, sell azaltır)."""
 
     def __init__(self, equity: float = 1000.0, positions: dict[str, float] | None = None):
         self._equity = equity
@@ -67,9 +91,13 @@ class FakeAlpaca:
         return self._equity
 
     def positions_usd(self) -> dict[str, float]:
-        return dict(self._positions)
+        return {k: v for k, v in self._positions.items() if v > 1e-9}
 
     def submit_notional_order(self, ticker: str, usd: float, side: str) -> dict:
-        order = {"symbol": ticker, "notional": round(usd, 2), "side": side}
+        held = self._positions.get(ticker, 0.0)
+        if side == "sell" and usd > held + 1e-6:
+            raise ShortSellBlockedError(f"{ticker}: sell ${usd} > mevcut ${held}")
+        self._positions[ticker] = held + usd if side == "buy" else held - usd
+        order = {"symbol": ticker, "notional": round(usd, 2), "side": side, "status": "filled"}
         self.submitted.append(order)
         return order
